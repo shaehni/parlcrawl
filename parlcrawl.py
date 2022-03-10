@@ -14,14 +14,15 @@ lang = 'de'
 r1 = re.compile(r'\d{2}\.\d{3,4}')  # Format für Geschäftsnummern
 r2 = re.compile(r'\d{8}')  # Format für Geschäfts-IDs
 today = datetime.today()
-version = '1.0'
+version = '1.01'
 
 # ArgumentParser
-ap = argparse.ArgumentParser(description='Parlcrawl v' + version)
+ap = argparse.ArgumentParser(usage='%(prog)s [-h] [-t Zeitraum] Geschäfts-Liste',
+                             description='Parlcrawl v' + version)
 
 ap.add_argument('listfile', type=argparse.FileType('r'),
                 help='Text-Datei mit Geschäftsnummern (eine pro Zeile) als ID (20212355) oder Kurzform (21.2355)')
-ap.add_argument('-t', type=int, default=7,
+ap.add_argument('-t', type=int, default=7, metavar='Tage',
                 help='Zeitraum, für den geänderte Vorstösse angezeigt werden (Standard: 7).')
 args = ap.parse_args()
 
