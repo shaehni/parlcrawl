@@ -14,14 +14,19 @@ lang = 'de'
 r1 = re.compile(r'\d{2}\.\d{3,4}')  # Format für Geschäftsnummern
 r2 = re.compile(r'\d{8}')  # Format für Geschäfts-IDs
 today = datetime.today()
-version = '1.01'
+version = '1.1'
 
 # ArgumentParser
 ap = argparse.ArgumentParser(usage='%(prog)s [-h] [-t Zeitraum] Geschäfts-Liste',
-                             description='Parlcrawl v' + version)
+                             description='Parlcrawl v' + version,
+                             epilog='\b')
 
-ap.add_argument('listfile', type=argparse.FileType('r'),
-                help='Text-Datei mit Geschäftsnummern (eine pro Zeile) als ID (20212355) oder Kurzform (21.2355)')
+ap.add_argument('listfile', type=argparse.FileType('r'), metavar='Geschäftsliste',
+                help='Text-Datei mit Geschäftsnummern (eine pro Zeile) als ID (20212355) oder Kurzform (21.2355).')
+ap.add_argument('--dry', action='store_true',
+                help='Prüft nur die Dateiliste ohne Anfrage an die API.')
+ap.add_argument('--ignore-done', action='store_true',
+                help='Blendet Information aus, wenn Geschäfte erledigt sind.')
 ap.add_argument('-t', type=int, default=7, metavar='Tage',
                 help='Zeitraum, für den geänderte Vorstösse angezeigt werden (Standard: 7).')
 args = ap.parse_args()
@@ -94,18 +99,30 @@ def main():
     affairs = load_affairs(args.listfile)
     print()
 
+    # Ende falls --dry
+    if args.dry:
+        print("[i] Dry-Run: Geschäfte werden nicht gegen Datenbank geprüft.")
+        return
+
     # Prüfe Daten
     i = 0
     for affair in affairs:
         affair_data = get_json(affair)
         if affair_data:
+            # Prüfe Aktualisierungsdatum
             if check_recent_update(affair_data['updated'], args.t):
                 print(affair_data['shortId'] + ': ' + affair_data['title']
                       + ' (' + affair_data['updated'][0:10] + ')')
                 i += 1
+            else:
+                # Information, falls Geschäft bereits erledigt ist
+                if affair_data['state']['doneKey'] == '1' and args.ignore_done == False:
+                    print('[i] Erledigtes Geschäft: ' + affair_data['shortId'] + ': ' + affair_data['title'])
 
     print()
     print(str(i) + ' Geschäfte gefunden, die in den letzten ' + str(args.t) + ' Tagen aktualisiert wurden.')
+    return
+
 
 if __name__ == '__main__':
     main()
