@@ -3,6 +3,7 @@
 # Module
 import argparse
 import json
+import os
 import re
 import requests
 
@@ -14,7 +15,7 @@ lang = 'de'
 r1 = re.compile(r'\d{2}\.\d{3,4}')  # Format für Geschäftsnummern
 r2 = re.compile(r'\d{8}')  # Format für Geschäfts-IDs
 today = datetime.today()
-version = '1.1'
+version = '1.2'
 
 # ArgumentParser
 ap = argparse.ArgumentParser(usage='%(prog)s [-h] [-t Zeitraum] Geschäfts-Liste',
@@ -23,8 +24,12 @@ ap = argparse.ArgumentParser(usage='%(prog)s [-h] [-t Zeitraum] Geschäfts-Liste
 
 ap.add_argument('listfile', type=argparse.FileType('r'), metavar='Geschäftsliste',
                 help='Text-Datei mit Geschäftsnummern (eine pro Zeile) als ID (20212355) oder Kurzform (21.2355).')
+ap.add_argument('--create-cache', action='store_true',
+                help='Speichert die abgerufenen Daten lokal ab.')
 ap.add_argument('--dry', action='store_true',
                 help='Prüft nur die Dateiliste ohne Anfrage an die API.')
+ap.add_argument('--from-cache', action='store_true',
+                help='Liest Geschäftsdaten aus dem Cache anstelle der API.')
 ap.add_argument('--ignore-done', action='store_true',
                 help='Blendet Information aus, wenn Geschäfte erledigt sind.')
 ap.add_argument('-t', type=int, default=7, metavar='Tage',
@@ -62,23 +67,50 @@ def load_affairs(list_file):
     return affairs_list
 
 
-# Hole JSON-Daten via API
+# Hole JSON-Daten via API oder Cache
 def get_json(affairid):
     global api_url, lang
-    try:
-        url = api_url + 'affairs/' + affairid + '?format=json&lang=' + lang
-        headers = {'Accept': 'text/json'}
-        r = requests.get(url, headers=headers)
-    except Exception as e:
-        print('[!] Verbindungsfehler. ' + str(e))
-        return False
 
-    if r.status_code == 200:
-        out = json.loads(r.text)
-        return out
+    if args.from_cache:
+        try:
+            f = open('cache/' + affairid + '.txt', 'r')
+            raw_data = f.read()
+        except FileNotFoundError:
+            print('[!] Cache für ' + affairid + ' existiert nicht. Verwende --create-cache um Cache zu erstellen.')
+            return False
+        except Exception as e:
+            print('[!] Fehler beim Öffnen des Caches für ' + affairid + '. ' + str(e))
+            return False
     else:
-        print('[!] ' + affairid + ': Konnte Geschäftsdaten nicht abrufen. Ungültige Geschäftsnummer?')
-        return False
+        try:
+            url = api_url + 'affairs/' + affairid + '?format=json&lang=' + lang
+            headers = {'Accept': 'text/json'}
+            r = requests.get(url, headers=headers)
+        except Exception as e:
+            print('[!] Verbindungsfehler. ' + str(e))
+            return False
+
+        if r.status_code == 200:
+            raw_data = r.text
+            # Caching
+            if args.create_cache:
+                create_cache(affairid, raw_data)
+        else:
+            print('[!] ' + affairid + ': Konnte Geschäftsdaten nicht abrufen. Ungültige Geschäftsnummer?')
+            return False
+
+    return json.loads(raw_data)
+
+
+# Cache JSON-Rohdaten
+def create_cache(affairid, raw_data):
+    try:
+        f = open('cache/' + affairid + '.txt', 'w')
+        f.write(raw_data)
+        f.close()
+    except Exception as e:
+        print('[!] Konnte Cache für ' + affairid + ' nicht schreiben. ' + str(e))
+    return
 
 
 # Vergleiche Datum
@@ -99,6 +131,16 @@ def main():
     affairs = load_affairs(args.listfile)
     print()
 
+    # Cache-Ordner
+    if args.create_cache:
+        foldername = 'cache'
+        if not os.path.exists(foldername):
+            try:
+                os.makedirs(foldername)
+            except Exception as e:
+                print('[!] Konnte Order cache nicht erstellen. ' + str(e))
+                args.create_cache = False
+
     # Ende falls --dry
     if args.dry:
         print("[i] Dry-Run: Geschäfte werden nicht gegen Datenbank geprüft.")
@@ -116,7 +158,7 @@ def main():
                 i += 1
             else:
                 # Information, falls Geschäft bereits erledigt ist
-                if affair_data['state']['doneKey'] == '1' and args.ignore_done == False:
+                if affair_data['state']['doneKey'] == '1' and not args.ignore_done:
                     print('[i] Erledigtes Geschäft: ' + affair_data['shortId'] + ': ' + affair_data['title'])
 
     print()
