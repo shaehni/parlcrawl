@@ -16,7 +16,7 @@ lang = 'de'
 r1 = re.compile(r'\d{2}\.\d{3,4}')  # Format für Geschäftsnummern
 r2 = re.compile(r'\d{8}')  # Format für Geschäfts-IDs
 today = datetime.today()
-version = '1.3'
+version = '1.4'
 
 # ArgumentParser
 ap = argparse.ArgumentParser(usage='%(prog)s [-h] [-t Zeitraum] Geschäfts-Liste',
@@ -24,6 +24,8 @@ ap = argparse.ArgumentParser(usage='%(prog)s [-h] [-t Zeitraum] Geschäfts-Liste
                              epilog='\b')
 
 ap.add_argument('listfile', type=argparse.FileType('r'), metavar='Geschäftsliste',
+                help='Text-Datei mit Geschäftsnummern (eine pro Zeile) als ID (20212355) oder Kurzform (21.2355).')
+ap.add_argument('--compare', type=argparse.FileType('r'), metavar='Vergleichsliste',
                 help='Text-Datei mit Geschäftsnummern (eine pro Zeile) als ID (20212355) oder Kurzform (21.2355).')
 ap.add_argument('--create-cache', action='store_true',
                 help='Speichert die abgerufenen Daten lokal ab.')
@@ -181,15 +183,29 @@ def get_state(affair_data):
 # Start Main
 def main():
     # Lade Geschäfte
+    print('### Lade Geschäfte...')
     affairs = load_affairs(args.listfile)
     print(str(len(affairs)) + ' Geschäfte geladen.\n')
 
+    # Falls Vergleichsliste angegeben
+    if args.compare:
+        print('### Vergleiche Geschäftsliste mit Vergleichsliste...')
+        i = 0
+        compare_list = load_affairs(args.compare)
+        for compare_item in compare_list:
+            if compare_item in affairs:
+                print(compare_item + ' ist in Vergleichsliste enthalten.')
+                i += 1
+        print(str(i) + ' Geschäft(e) in Vergleichsliste gefunden.\n'
+                  '### Vergleich abgeschlossen\n')
+
     # Ende falls --dry
     if args.dry:
-        print("[i] Dry-Run: Geschäfte werden nicht gegen Datenbank geprüft.")
+        print('[i] Dry-Run: Geschäfte werden nicht gegen Datenbank geprüft.')
         return
 
     # Prüfe Daten
+    print('### Prüfe Geschäftsliste auf aktualisierte Geschäfte...')
     i = 0
     for affair in affairs:
         try:
@@ -212,7 +228,7 @@ def main():
         if args.print_state:
             print(get_state(affair_data))
 
-    print('\n' + str(i) + ' Geschäfte gefunden, die in den letzten ' + str(args.t) + ' Tagen aktualisiert wurden.')
+    print('\n' + str(i) + ' Geschäft(e) gefunden mit Aktualisierungsdatum in den letzten ' + str(args.t) + ' Tagen.')
     return
 
 
