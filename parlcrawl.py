@@ -16,7 +16,7 @@ lang = 'de'
 r1 = re.compile(r'\d{2}\.\d{3,4}')  # Format für Geschäftsnummern
 r2 = re.compile(r'\d{8}')  # Format für Geschäfts-IDs
 today = datetime.today()
-version = '1.4'
+version = '1.41'
 
 # ArgumentParser
 ap = argparse.ArgumentParser(usage='%(prog)s [-h] [-t Zeitraum] Geschäfts-Liste',
@@ -196,8 +196,8 @@ def main():
             if compare_item in affairs:
                 print(compare_item + ' ist in Vergleichsliste enthalten.')
                 i += 1
-        print(str(i) + ' Geschäft(e) in Vergleichsliste gefunden.\n'
-                  '### Vergleich abgeschlossen\n')
+        print('\n' + str(i) + ' Geschäft(e) in Vergleichsliste gefunden.\n'
+                       '### Vergleich abgeschlossen\n')
 
     # Ende falls --dry
     if args.dry:
