@@ -8,6 +8,7 @@ import re
 import requests
 
 from datetime import datetime
+from termcolor import colored
 
 # Globale Variablen
 api_url = 'http://ws-old.parlament.ch/'
@@ -16,7 +17,7 @@ lang = 'de'
 r1 = re.compile(r'\d{2}\.\d{3,4}')  # Format für Geschäftsnummern
 r2 = re.compile(r'\d{8}')  # Format für Geschäfts-IDs
 today = datetime.today()
-version = '1.41'
+version = '1.5'
 
 # ArgumentParser
 ap = argparse.ArgumentParser(usage='%(prog)s [-h] [-t Zeitraum] Geschäfts-Liste',
@@ -51,7 +52,7 @@ def load_affairs(list_file):
     try:
         al = list_file.read().splitlines()
     except Exception as e:
-        print('[!] Konnte Datei nicht öffnen. ' + str(e))
+        print(colored('[!] Konnte Datei nicht öffnen. ' + str(e), 'red'))
     else:
         list_file.close()
 
@@ -66,12 +67,12 @@ def load_affairs(list_file):
         elif r2.match(affair):
             append = affair
         else:
-            print('[!] Ungültiger Eintrag: ' + affair)
+            print(colored('[!] Ungültiger Eintrag: ' + affair, 'red'))
             continue
 
         # Check auf Duplikate
         if append in affairs_list:
-            print('[!] Duplikat: ' + append)
+            print(colored('[!] Duplikat: ' + append, 'magenta'))
         else:
             affairs_list.append(append)
 
@@ -118,7 +119,7 @@ def check_cache_folder(folder_name):
         try:
             os.makedirs(folder_name)
         except Exception as e:
-            print('[!] Konnte Order cache nicht erstellen. ' + str(e))
+            print(colored('[!] Konnte Order cache nicht erstellen. ' + str(e), 'red'))
         else:
             return True
     return False
@@ -183,52 +184,54 @@ def get_state(affair_data):
 # Start Main
 def main():
     # Lade Geschäfte
-    print('### Lade Geschäfte...')
+    print(colored('### Lade Geschäfte...', 'yellow'))
     affairs = load_affairs(args.listfile)
     print(str(len(affairs)) + ' Geschäfte geladen.\n')
 
     # Falls Vergleichsliste angegeben
     if args.compare:
-        print('### Vergleiche Geschäftsliste mit Vergleichsliste...')
+        print(colored('### Vergleiche Geschäftsliste mit Vergleichsliste...', 'yellow'))
         i = 0
         compare_list = load_affairs(args.compare)
         for compare_item in compare_list:
             if compare_item in affairs:
-                print(compare_item + ' ist in Vergleichsliste enthalten.')
+                print(colored(compare_item, 'cyan') + ' ist in Vergleichsliste enthalten.')
                 i += 1
-        print('\n' + str(i) + ' Geschäft(e) in Vergleichsliste gefunden.\n'
-                       '### Vergleich abgeschlossen\n')
+        print('\n' + colored(str(i) + ' Geschäft(e) in Vergleichsliste gefunden.\n'
+                              '### Vergleich abgeschlossen\n', 'yellow'))
 
     # Ende falls --dry
     if args.dry:
-        print('[i] Dry-Run: Geschäfte werden nicht gegen Datenbank geprüft.')
+        print(colored('[i] Dry-Run: Geschäfte werden nicht gegen Datenbank geprüft.', 'magenta'))
         return
 
     # Prüfe Daten
-    print('### Prüfe Geschäftsliste auf aktualisierte Geschäfte...')
+    print(colored('### Prüfe Geschäftsliste auf aktualisierte Geschäfte...', 'yellow'))
     i = 0
     for affair in affairs:
         try:
             affair_data = get_json(affair)
         except Exception as e:
-            print('[!] ' + str(e))
+            print(colored('[!] ' + str(e), 'red'))
             continue
 
         # Prüfe Aktualisierungsdatum
         if check_recent_update(affair_data['updated'], args.t):
-            print(affair_data['shortId'] + ': ' + affair_data['title']
+            print(colored(affair_data['shortId'] + ': ', 'cyan') + affair_data['title']
                   + ' (' + affair_data['updated'][0:10] + ')')
             i += 1
         else:
             # Information, falls Geschäft bereits erledigt ist
             if affair_data['state']['doneKey'] == '1' and not args.ignore_done:
-                print('[i] Erledigtes Geschäft: ' + affair_data['shortId'] + ': ' + affair_data['title'])
+                print(colored('[i] Erledigtes Geschäft: ' + affair_data['shortId'] + ': ' +
+                              affair_data['title'], 'red'))
 
         # Geschäfts-Status
         if args.print_state:
             print(get_state(affair_data))
 
-    print('\n' + str(i) + ' Geschäft(e) gefunden mit Aktualisierungsdatum in den letzten ' + str(args.t) + ' Tagen.')
+    print('\n' + colored(str(i) + ' Geschäft(e) gefunden mit Aktualisierungsdatum in den letzten ' +
+                         str(args.t) + ' Tagen.', 'yellow'))
     return
 
 
