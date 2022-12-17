@@ -8,6 +8,7 @@ import re
 import requests
 
 from datetime import datetime
+from progress.bar import Bar
 from termcolor import colored
 
 # Globale Variablen
@@ -17,7 +18,7 @@ lang = 'de'
 r1 = re.compile(r'\d{2}\.\d{3,4}')  # Format für Geschäftsnummern
 r2 = re.compile(r'\d{8}')  # Format für Geschäfts-IDs
 today = datetime.today()
-version = '1.5'
+version = '1.6'
 
 # ArgumentParser
 ap = argparse.ArgumentParser(usage='%(prog)s [-h] [-t Zeitraum] Geschäfts-Liste',
@@ -198,7 +199,7 @@ def main():
                 print(colored(compare_item, 'cyan') + ' ist in Vergleichsliste enthalten.')
                 i += 1
         print('\n' + colored(str(i) + ' Geschäft(e) in Vergleichsliste gefunden.\n'
-                              '### Vergleich abgeschlossen\n', 'yellow'))
+                                      '### Vergleich abgeschlossen\n', 'yellow'))
 
     # Ende falls --dry
     if args.dry:
@@ -207,31 +208,54 @@ def main():
 
     # Prüfe Daten
     print(colored('### Prüfe Geschäftsliste auf aktualisierte Geschäfte...', 'yellow'))
-    i = 0
+    bar = Bar('Bitte warten...', max=len(affairs))
+    updated_affairs = []
+    affairs_done = []
+
     for affair in affairs:
         try:
             affair_data = get_json(affair)
         except Exception as e:
             print(colored('[!] ' + str(e), 'red'))
+            bar.next()
             continue
 
         # Prüfe Aktualisierungsdatum
         if check_recent_update(affair_data['updated'], args.t):
-            print(colored(affair_data['shortId'] + ': ', 'cyan') + affair_data['title']
-                  + ' (' + affair_data['updated'][0:10] + ')')
-            i += 1
+            updated_affairs.append({'shortId': affair_data['shortId'],
+                                    'title': affair_data['title'],
+                                    'updated': affair_data['updated'][0:10]})
         else:
-            # Information, falls Geschäft bereits erledigt ist
-            if affair_data['state']['doneKey'] == '1' and not args.ignore_done:
-                print(colored('[i] Erledigtes Geschäft: ' + affair_data['shortId'] + ': ' +
-                              affair_data['title'], 'red'))
+            # Erledigte Geschäfte
+            if affair_data['state']['doneKey'] == '1':
+                affairs_done.append({'shortId': affair_data['shortId'],
+                                     'title': affair_data['title']})
 
         # Geschäfts-Status
         if args.print_state:
             print(get_state(affair_data))
 
-    print('\n' + colored(str(i) + ' Geschäft(e) gefunden mit Aktualisierungsdatum in den letzten ' +
-                         str(args.t) + ' Tagen.', 'yellow'))
+        bar.next()
+    bar.finish()
+
+    # Sortiere Geschäfte nach Datum
+    updated_affairs = sorted(updated_affairs, key=lambda x: x['updated'])
+
+    # Zeige aktualisierte Geschäfte
+    print('\n' + colored(str(len(updated_affairs)) + ' Geschäft(e) gefunden mit Aktualisierungsdatum in den letzten ' +
+                         str(args.t) + ' Tagen', 'yellow'))
+    for affair in updated_affairs:
+        print(colored(affair['shortId'] + ': ', 'cyan') + affair['title']
+              + ' (' + affair['updated'][0:10] + ')')
+
+    # Zeige erledigte Geschäfte
+    if len(affairs_done) > 0 and not args.ignore_done:
+        print(colored('\n[i] ' + str(len(affairs_done)) + ' erledigte Geschäfte', 'yellow'))
+        for affair in affairs_done:
+            print(colored(affair['shortId'] + ': ', 'cyan') +
+                  affair['title'])
+
+    print('')
     return
 
 
