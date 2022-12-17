@@ -18,7 +18,7 @@ lang = 'de'
 r1 = re.compile(r'\d{2}\.\d{3,4}')  # Format für Geschäftsnummern
 r2 = re.compile(r'\d{8}')  # Format für Geschäfts-IDs
 today = datetime.today()
-version = '1.6'
+version = '1.61'
 
 # ArgumentParser
 ap = argparse.ArgumentParser(usage='%(prog)s [-h] [-t Zeitraum] Geschäfts-Liste',
@@ -179,7 +179,7 @@ def get_state(affair_data):
     else:
         state = 'Kein Status'
 
-    return affair_data['shortId'] + ': ' + state
+    return state
 
 
 # Start Main
@@ -224,16 +224,13 @@ def main():
         if check_recent_update(affair_data['updated'], args.t):
             updated_affairs.append({'shortId': affair_data['shortId'],
                                     'title': affair_data['title'],
-                                    'updated': affair_data['updated'][0:10]})
+                                    'updated': affair_data['updated'][0:10],
+                                    'state': get_state(affair_data)})
         else:
             # Erledigte Geschäfte
             if affair_data['state']['doneKey'] == '1':
                 affairs_done.append({'shortId': affair_data['shortId'],
                                      'title': affair_data['title']})
-
-        # Geschäfts-Status
-        if args.print_state:
-            print(get_state(affair_data))
 
         bar.next()
     bar.finish()
@@ -245,12 +242,18 @@ def main():
     print('\n' + colored(str(len(updated_affairs)) + ' Geschäft(e) gefunden mit Aktualisierungsdatum in den letzten ' +
                          str(args.t) + ' Tagen', 'yellow'))
     for affair in updated_affairs:
-        print(colored(affair['shortId'] + ': ', 'cyan') + affair['title']
-              + ' (' + affair['updated'][0:10] + ')')
+        p = colored(affair['shortId'] + ': ', 'cyan') + affair['title'] + ' (' + affair['updated'][0:10] + ')'
+
+        # Geschäftsstatus
+        if args.print_state:
+            p += colored(' ' + affair['state'] , 'magenta')
+
+        print(p)
 
     # Zeige erledigte Geschäfte
     if len(affairs_done) > 0 and not args.ignore_done:
         print(colored('\n[i] ' + str(len(affairs_done)) + ' erledigte Geschäfte', 'yellow'))
+
         for affair in affairs_done:
             print(colored(affair['shortId'] + ': ', 'cyan') +
                   affair['title'])
