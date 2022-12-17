@@ -246,7 +246,7 @@ def main():
 
         # Geschäftsstatus
         if args.print_state:
-            p += colored(' ' + affair['state'] , 'magenta')
+            p += colored(' ' + affair['state'], 'magenta')
 
         print(p)
 
